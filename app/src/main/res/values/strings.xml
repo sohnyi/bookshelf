@@ -1,0 +1,14 @@
+<resources>
+    <string name="app_name">bookshelf</string>
+    <string name="dis_subtitle">副标题: %1$s</string>
+    <string name="dis_author">作者: %1$s</string>
+    <string name="dis_translator">译者: %1$s</string>
+    <string name="dis_original_title">原名: %1$s</string>
+    <string name="dis_publisher">出版社: %1$s</string>
+    <string name="dis_publish_date">出版日期: %1$s</string>
+    <string name="dis_pages">页数: %1$s</string>
+    <string name="dis_price">定价: %1$s</string>
+    <string name="dis_isbn">ISBN: %1$s</string>
+    <string name="dis_item_publish">%1$s %2$s</string>
+    <string name="error_get_suggest">get suggest Error!</string>
+</resources>
