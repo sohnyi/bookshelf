@@ -14,3 +14,4 @@
 .cxx
 local.properties
 /app/schemas/com.sohnyi.bookshelf.database.BookShelfDatabase/
+/.idea/
