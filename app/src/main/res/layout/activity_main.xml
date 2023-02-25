@@ -7,14 +7,14 @@
     tools:context=".MainActivity">
 
     <com.google.android.material.floatingactionbutton.FloatingActionButton
-        android:id="@+id/btn_add"
+        android:id="@+id/btn_scan"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:layout_marginBottom="32dp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:srcCompat="@drawable/ic_baseline_add_24"
-        android:layout_marginBottom="32dp"
+        app:srcCompat="@drawable/iv_scanner"
         app:tint="@android:color/white" />
 
     <TextView
@@ -27,12 +27,12 @@
         android:textSize="18sp"
         android:textStyle="bold"
         app:layout_constrainedWidth="true"
-        app:layout_constraintBottom_toTopOf="@id/btn_add"
+        app:layout_constraintBottom_toTopOf="@id/btn_scan"
         app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.1"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintVertical_bias="0.2"
-        app:layout_constraintHorizontal_bias="0.1"
         tools:text="@string/app_name" />
 
     <ImageView
@@ -64,23 +64,24 @@
         android:id="@+id/tv_author"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
         android:layout_marginEnd="16dp"
         android:maxLines="2"
-        android:layout_marginTop="8dp"
         android:textColor="@android:color/black"
         app:layout_constrainedWidth="true"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintHorizontal_bias="0"
         app:layout_constraintStart_toStartOf="@id/tv_subtitle"
         app:layout_constraintTop_toBottomOf="@id/tv_subtitle"
+        app:layout_goneMarginStart="16dp"
         tools:text="@string/app_name" />
 
     <TextView
         android:id="@+id/tv_translator"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginEnd="16dp"
         android:layout_marginTop="4dp"
+        android:layout_marginEnd="16dp"
         android:maxLines="2"
         android:textColor="@android:color/black"
         app:layout_constrainedWidth="true"
@@ -88,14 +89,15 @@
         app:layout_constraintHorizontal_bias="0"
         app:layout_constraintStart_toStartOf="@id/tv_subtitle"
         app:layout_constraintTop_toBottomOf="@id/tv_author"
+        app:layout_goneMarginStart="16dp"
         tools:text="@string/app_name" />
 
     <TextView
         android:id="@+id/tv_original_title"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginEnd="16dp"
         android:layout_marginTop="4dp"
+        android:layout_marginEnd="16dp"
         android:maxLines="2"
         android:textColor="@android:color/black"
         app:layout_constrainedWidth="true"
@@ -103,6 +105,7 @@
         app:layout_constraintHorizontal_bias="0"
         app:layout_constraintStart_toStartOf="@id/tv_subtitle"
         app:layout_constraintTop_toBottomOf="@id/tv_translator"
+        app:layout_goneMarginStart="16dp"
         tools:text="@string/app_name" />
 
     <TextView
@@ -118,6 +121,7 @@
         app:layout_constraintHorizontal_bias="0"
         app:layout_constraintStart_toStartOf="@id/tv_original_title"
         app:layout_constraintTop_toBottomOf="@id/tv_original_title"
+        app:layout_goneMarginStart="16dp"
         tools:text="@string/app_name" />
 
     <TextView
@@ -133,6 +137,7 @@
         app:layout_constraintHorizontal_bias="0"
         app:layout_constraintStart_toStartOf="@id/tv_author"
         app:layout_constraintTop_toBottomOf="@id/tv_publisher"
+        app:layout_goneMarginStart="16dp"
         tools:text="@string/app_name" />
 
     <TextView
@@ -148,6 +153,7 @@
         app:layout_constraintHorizontal_bias="0"
         app:layout_constraintStart_toStartOf="@id/tv_date"
         app:layout_constraintTop_toBottomOf="@id/tv_date"
+        app:layout_goneMarginStart="16dp"
         tools:text="@string/app_name" />
 
     <TextView
@@ -163,6 +169,7 @@
         app:layout_constraintHorizontal_bias="0"
         app:layout_constraintStart_toStartOf="@id/tv_pages"
         app:layout_constraintTop_toBottomOf="@id/tv_pages"
+        app:layout_goneMarginStart="16dp"
         tools:text="@string/app_name" />
 
     <TextView
@@ -178,6 +185,7 @@
         app:layout_constraintHorizontal_bias="0"
         app:layout_constraintStart_toStartOf="@id/tv_price"
         app:layout_constraintTop_toBottomOf="@id/tv_price"
+        app:layout_goneMarginStart="16dp"
         tools:text="@string/app_name" />
 
     <TextView
@@ -186,7 +194,7 @@
         android:layout_height="wrap_content"
         android:layout_marginHorizontal="24dp"
         android:layout_marginTop="24dp"
-        android:maxLines="3"
+        android:maxLines="5"
         android:textColor="@android:color/black"
         app:layout_constrainedWidth="true"
         app:layout_constraintEnd_toEndOf="parent"
@@ -194,6 +202,16 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/tv_isbn"
         tools:text="@string/app_name" />
+
+    <ImageButton
+        android:id="@+id/btn_add"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:src="@drawable/ic_baseline_add_24"
+        android:visibility="gone"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/tv_description" />
 
     <ProgressBar
         android:id="@+id/progressBar"
@@ -204,6 +222,16 @@
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <ImageView
+        android:id="@+id/iv_list"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:layout_marginEnd="16dp"
+        android:src="@drawable/ic_baseline_view_list_24"
+        app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

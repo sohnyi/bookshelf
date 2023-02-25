@@ -9,6 +9,7 @@
     <string name="dis_pages">页数: %1$s</string>
     <string name="dis_price">定价: %1$s</string>
     <string name="dis_isbn">ISBN: %1$s</string>
-    <string name="dis_item_publish">%1$s %2$s</string>
+    <string name="dis_item_publish">%1$s / %2$s / %3$s</string>
     <string name="error_get_suggest">get suggest Error!</string>
+    <string name="no_result">未查询到结果</string>
 </resources>

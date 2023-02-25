@@ -2,7 +2,7 @@ package com.sohnyi.bookshelf
 
 
 import androidx.annotation.Nullable
-import org.jetbrains.annotations.NotNull
+import com.sohnyi.bookshelf.entry.BookInfo
 import org.jsoup.Jsoup
 import org.jsoup.internal.StringUtil
 import org.jsoup.nodes.Document
@@ -10,7 +10,6 @@ import org.jsoup.nodes.Element
 import org.jsoup.nodes.Node
 import org.jsoup.nodes.TextNode
 import org.jsoup.select.NodeTraversor
-import org.jsoup.select.NodeVisitor
 import java.io.IOException
 import java.lang.StringBuilder
 import java.util.HashMap
@@ -30,13 +29,12 @@ class DoubanSubjectParse {
         private const val OG_URL = "og:url"
         private const val OG_DESC = "og:description"
 
-        @Nullable
-        fun getBookInfoBySubjectId(@NotNull id: String): DoubanBookInfo? {
-            var bookInfo: DoubanBookInfo? = null
+        fun getBookInfoBySubjectId(id: String): BookInfo? {
+            var bookInfo: BookInfo? = null
             val url = URL_DOUBAN_BOOK_SUBJECT + id
             try {
                 val doc: Document = Jsoup.connect(url).get()
-                bookInfo = DoubanBookInfo(id)
+                bookInfo = BookInfo(id)
                 val metaMap = getMetaFormDocument(doc)
                 val infoMap = getInfoFormDocument(doc)
                 bookInfo.title = metaMap[OG_TITLE]
@@ -50,6 +48,7 @@ class DoubanSubjectParse {
                 bookInfo.publishDate = infoMap["出版年"]
                 bookInfo.translator = infoMap["译者"]
                 bookInfo.subtitle = infoMap["副标题"]
+                bookInfo.format = infoMap["装帧"]
                 bookInfo.originalTitle = infoMap["原作题"]
 
             } catch (e: IOException) {
@@ -60,7 +59,7 @@ class DoubanSubjectParse {
         }
 
         @Nullable
-        private fun getMetaFormDocument(@NotNull doc: Document): HashMap<String, String> {
+        private fun getMetaFormDocument(doc: Document): HashMap<String, String> {
             val map = HashMap<String, String>()
             val metas = doc.getElementsByTag("meta")
             for (meta in metas) {
@@ -72,12 +71,12 @@ class DoubanSubjectParse {
         }
 
         @Nullable
-        private fun getInfoFormDocument(@NotNull doc: Document): HashMap<String, String> {
+        private fun getInfoFormDocument(doc: Document): HashMap<String, String> {
             // 获取info相关信息
             val info = doc.selectFirst("div#info")
             val accum: StringBuilder = StringUtil.borrowBuilder()
             info?.let {
-                NodeTraversor.traverse(NodeVisitor { node: Node, _: Int ->
+                NodeTraversor.traverse({ node: Node, _: Int ->
                     if (node is TextNode) {
                         val textNode: TextNode = node
                         accum.append(textNode.wholeText.trim { it <= ' ' })

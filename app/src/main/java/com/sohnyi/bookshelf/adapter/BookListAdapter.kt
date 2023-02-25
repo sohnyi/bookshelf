@@ -6,18 +6,18 @@ import android.view.ViewGroup
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import coil.load
-import com.sohnyi.bookshelf.DoubanBookInfo
 import com.sohnyi.bookshelf.R
 import com.sohnyi.bookshelf.databinding.ItemBookBinding
+import com.sohnyi.bookshelf.entry.BookInfo
 
 /**
  *
  * Create by yi on Thu 2022/09/22
  */
-class BookListAdapter
-    : ListAdapter<DoubanBookInfo, BookListAdapter.BookListViewHolder>(
-    DoubanBookDiffCallback
-) {
+class BookListAdapter(private val onItemClick: (isbn: String) -> Unit) :
+    ListAdapter<BookInfo, BookListAdapter.BookListViewHolder>(
+        BookDiffCallback
+    ) {
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): BookListViewHolder {
         val itemView = LayoutInflater.from(parent.context)
             .inflate(R.layout.item_book, parent, false)
@@ -43,8 +43,9 @@ class BookListAdapter
             binding.tvAuthor.text = info.author ?: ""
             binding.tvPublish.text =
                 binding.tvPublish.context.getString(
-                    R.string.dis_item_publish, info.publisher, info.publishDate
+                    R.string.dis_item_publish, info.publisher, info.publishDate, info.price
                 )
+            itemView.setOnClickListener { onItemClick(info.isbn) }
         }
     }
 

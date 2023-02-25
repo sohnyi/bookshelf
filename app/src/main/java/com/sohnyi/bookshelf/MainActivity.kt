@@ -1,26 +1,40 @@
 package com.sohnyi.bookshelf
 
+import android.app.Activity
+import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
-import android.util.DisplayMetrics
 import android.util.Log
 import android.view.View
 import android.widget.Toast
+import android.window.OnBackInvokedDispatcher
+import androidx.activity.OnBackPressedCallback
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.StringRes
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import coil.load
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
-import com.google.zxing.client.android.BuildConfig
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanIntentResult
 import com.journeyapps.barcodescanner.ScanOptions
+import com.sohnyi.bookshelf.database.BookInfoRepository
 import com.sohnyi.bookshelf.databinding.ActivityMainBinding
+import com.sohnyi.bookshelf.entry.BookInfo
 import com.sohnyi.bookshelf.model.RepoSubjectSuggest
+import com.sohnyi.bookshelf.utils.LogUtil
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import okhttp3.*
+import okhttp3.OkHttpClient
+import okhttp3.HttpUrl
+import okhttp3.Request
+import okhttp3.Response
+import okhttp3.Call
+import okhttp3.Callback
 import okhttp3.logging.HttpLoggingInterceptor
 import java.io.IOException
 
@@ -31,20 +45,26 @@ class MainActivity : AppCompatActivity() {
         private const val TAG = "MainActivity"
     }
 
-    private lateinit var binding: ActivityMainBinding
+    private lateinit var mBinding: ActivityMainBinding
 
-    private val barcodeLauncher = registerForActivityResult(
+
+    private val mBookList: MutableList<BookInfo> by lazy {
+        mutableListOf()
+    }
+    private var mBookInfo: BookInfo? = null
+
+    private val mBarcodeLauncher = registerForActivityResult(
         ScanContract()
     ) { result: ScanIntentResult ->
         if (result.contents == null) {
             Toast.makeText(this@MainActivity, "Cancelled", Toast.LENGTH_LONG).show()
         } else {
             getUrlBodyByCode(result.contents)
-            binding.progressBar.visibility = View.VISIBLE
+            mBinding.progressBar.visibility = View.VISIBLE
         }
     }
 
-    private val okHttpClient: OkHttpClient by lazy {
+    private val mOkHttpClient: OkHttpClient by lazy {
         val loggingInterceptor = HttpLoggingInterceptor().apply {
             if (BuildConfig.DEBUG) {
                 setLevel(HttpLoggingInterceptor.Level.BODY)
@@ -59,26 +79,90 @@ class MainActivity : AppCompatActivity() {
     }
 
 
-    private var subjectId: String = ""
+    private var mSubjectId: String = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        binding = ActivityMainBinding.inflate(layoutInflater)
-        setContentView(binding.root)
+        mBinding = ActivityMainBinding.inflate(layoutInflater)
+        setContentView(mBinding.root)
 
-        binding.btnAdd.setOnClickListener { scanBarCode() }
+        mBinding.btnScan.setOnClickListener { scanBarCode() }
+
+        val bookListLauncher =
+            registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+                if (result.resultCode == Activity.RESULT_OK) {
+                    result.data?.let { data ->
+                        BookListActivity.getIsbnResult(data)?.let { isbn ->
+                            mBookInfo = mBookList.find { isbn == it.isbn }
+                            mBookInfo?.let {
+                                updateBookInfoUI(it)
+                                it.lastOpenedTime = System.currentTimeMillis()
+                                lifecycleScope.launch(Dispatchers.IO) {
+                                    BookInfoRepository.get().updateBook(it)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+        // 查看所有书目
+        mBinding.ivList.setOnClickListener {
+            bookListLauncher.launch(Intent(this, BookListActivity::class.java))
+        }
+
+        // 加载所有书目
+        lifecycleScope.launch(Dispatchers.Main) {
+            showLoading()
+            val job = async(Dispatchers.IO) {
+                mBookList.addAll(BookInfoRepository.get().getAllBooks())
+            }
+            job.await()
+            withContext(Dispatchers.Main) {
+                mBinding.progressBar.visibility = View.GONE
+                if (mBookList.isNotEmpty()) {
+                    updateBookInfoUI(mBookList[0])
+                }
+            }
+        }
+
+        // 添加到数据库
+        mBinding.btnAdd.setOnClickListener {
+            mBookInfo?.let { book ->
+                lifecycleScope.launch(Dispatchers.IO) {
+                    val savedInfo = mBookList.find { book.isbn == it.isbn }
+                    if (savedInfo == null) {
+                        mBookInfo = book
+                        BookInfoRepository.get().addBook(book)
+                        LogUtil.d(TAG, "getInfoBySubjectId: add book ${book.isbn}")
+                    } else if (savedInfo != book) {
+                        BookInfoRepository.get().updateBook(book)
+                        LogUtil.d(TAG, "getInfoBySubjectId: update book ${book.isbn}")
+                    } else {
+                        LogUtil.d(TAG, "getInfoBySubjectId: info is saved")
+                    }
+                }
+            }
+        }
+
+        onBackPressedDispatcher.addCallback(object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                showCloseDialog()
+            }
+        })
     }
 
     private fun scanBarCode() {
         val options = ScanOptions().apply {
+            captureActivity = MyCaptureActivity::class.java
             setDesiredBarcodeFormats(ScanOptions.ONE_D_CODE_TYPES)
             setCameraId(0)
             setPrompt("scan")
             setBeepEnabled(false)
+            setOrientationLocked(false)
             setBarcodeImageEnabled(true)
         }
-
-        barcodeLauncher.launch(options)
+        mBarcodeLauncher.launch(options)
     }
 
     private fun getUrlBodyByCode(code: String) {
@@ -89,18 +173,19 @@ class MainActivity : AppCompatActivity() {
             .addQueryParameter("q", code)
             .build()
 
+        showLoading()
         Log.i(TAG, "getUrlBody: ${httpUrl.toUrl()}")
         val request = Request.Builder()
             .url(httpUrl)
             .build()
         try {
-            okHttpClient
+            mOkHttpClient
                 .newCall(request)
                 .enqueue(object : Callback {
                     override fun onFailure(call: Call, e: IOException) {
                         runOnUiThread {
-                            binding.tvTitle.text = getString(R.string.error_get_suggest)
-                            binding.progressBar.visibility = View.INVISIBLE
+                            mBinding.tvTitle.text = getString(R.string.error_get_suggest)
+                            showNoResult(R.string.error_get_suggest)
                         }
                     }
 
@@ -111,115 +196,156 @@ class MainActivity : AppCompatActivity() {
                     }
                 })
         } catch (e: IOException) {
+            showNoResult(R.string.error_get_suggest)
             e.printStackTrace()
         }
     }
 
     private fun handleSuggestData(data: String) {
-        Log.i(TAG, "handleSuggestData: $data")
+        LogUtil.i(TAG, "handleSuggestData: $data")
         val gson = Gson()
         try {
             val listType = object : TypeToken<ArrayList<RepoSubjectSuggest>>() {}.type
             val suggests = gson.fromJson<ArrayList<RepoSubjectSuggest>>(data, listType)
-            Log.d(TAG, "handleSuggestData: title=${suggests[0].title}")
-            subjectId = suggests[0].id
-            if (subjectId.isNotBlank()) {
-                getInfoBySubjectId(subjectId)
+            if (suggests.isNotEmpty()) {
+                LogUtil.d(TAG, "handleSuggestData: title=${suggests[0].title}")
+                mSubjectId = suggests[0].id
+                if (mSubjectId.isNotBlank()) {
+                    getInfoBySubjectId(mSubjectId)
+                }
+            } else {
+                showNoResult(R.string.no_result)
             }
         } catch (e: Exception) {
+            showNoResult(R.string.no_result)
+            e.printStackTrace()
+        }
+    }
+
+    private fun showLoading() {
+        mBinding.btnAdd.visibility = View.GONE
+        mBinding.progressBar.visibility = View.VISIBLE
+    }
+
+    private fun showNoResult(@StringRes title: Int) {
+        runOnUiThread {
+            mBinding.progressBar.visibility = View.GONE
+            mBinding.btnAdd.visibility = View.GONE
+            mBinding.tvTitle.text = getString(title)
+            mBinding.tvTitle.visibility = View.VISIBLE
         }
     }
 
     private fun getInfoBySubjectId(id: String) {
-        Log.d(TAG, "getInfoBySubjectId: id=$id")
+        LogUtil.d(TAG, "getInfoBySubjectId: id=$id")
         lifecycleScope.launch(Dispatchers.Main) {
-            val bookInfo = withContext(Dispatchers.IO) {
+            val bookInfo = async(Dispatchers.IO) {
                 DoubanSubjectParse.getBookInfoBySubjectId(id)
             }
-            bookInfo?.let {
+            bookInfo.await()?.let {
+                it.lastOpenedTime = System.currentTimeMillis()
+                mBookInfo = it
                 updateBookInfoUI(it)
-            }
+                mBinding.btnAdd.visibility = View.VISIBLE
+            } ?: showNoResult(R.string.no_result)
         }
     }
 
-    private fun updateBookInfoUI(info: DoubanBookInfo) {
-        binding.progressBar.visibility = View.INVISIBLE
-        binding.tvTitle.text = info.title
-        Log.i(TAG, "updateBookInfoUI: imageUrl: ${info.image}")
+    private fun updateBookInfoUI(info: BookInfo) {
+        mBinding.progressBar.visibility = View.INVISIBLE
+        mBinding.tvTitle.text = info.title
+        LogUtil.i(TAG, "updateBookInfoUI: imageUrl: ${info.image}")
         info.image?.let {
             if (it.endsWith("jpg")) {
                 val url = it.substring(0, it.lastIndexOf(".")) + ".jpeg"
-                binding.ivCover.load(url) {
+                mBinding.ivCover.load(url) {
                     crossfade(true)
                 }
             } else {
-                binding.ivCover.load(it) {
+                mBinding.ivCover.load(it) {
                     crossfade(true)
                 }
             }
 
             // subtitle
             if (info.subtitle != null) {
-                binding.tvSubtitle.visibility = View.VISIBLE
-                binding.tvSubtitle.text = getString(R.string.dis_subtitle, info.subtitle)
+                mBinding.tvSubtitle.visibility = View.VISIBLE
+                mBinding.tvSubtitle.text = getString(R.string.dis_subtitle, info.subtitle)
             } else {
-                binding.tvSubtitle.visibility = View.GONE
+                mBinding.tvSubtitle.visibility = View.GONE
             }
             // author
             if (info.author != null) {
-                binding.tvAuthor.visibility = View.VISIBLE
-                binding.tvAuthor.text = getString(R.string.dis_author, info.author)
+                mBinding.tvAuthor.visibility = View.VISIBLE
+                mBinding.tvAuthor.text = getString(R.string.dis_author, info.author)
             } else {
-                binding.tvAuthor.visibility = View.GONE
+                mBinding.tvAuthor.visibility = View.GONE
             }
             // original title
             if (info.originalTitle != null) {
-                binding.tvOriginalTitle.visibility = View.VISIBLE
-                binding.tvOriginalTitle.text =
+                mBinding.tvOriginalTitle.visibility = View.VISIBLE
+                mBinding.tvOriginalTitle.text =
                     getString(R.string.dis_original_title, info.originalTitle)
             } else {
-                binding.tvOriginalTitle.visibility = View.GONE
+                mBinding.tvOriginalTitle.visibility = View.GONE
             }
             // translator
             if (info.translator != null) {
-                binding.tvTranslator.visibility = View.VISIBLE
-                binding.tvTranslator.text = getString(R.string.dis_translator, info.translator)
+                mBinding.tvTranslator.visibility = View.VISIBLE
+                mBinding.tvTranslator.text = getString(R.string.dis_translator, info.translator)
             } else {
-                binding.tvTranslator.visibility = View.GONE
+                mBinding.tvTranslator.visibility = View.GONE
             }
             // publish
             if (info.publisher != null) {
-                binding.tvPublisher.visibility = View.VISIBLE
-                binding.tvPublisher.text = getString(R.string.dis_publisher, info.publisher)
+                mBinding.tvPublisher.visibility = View.VISIBLE
+                mBinding.tvPublisher.text = getString(R.string.dis_publisher, info.publisher)
             } else {
-                binding.tvPublisher.visibility = View.GONE
+                mBinding.tvPublisher.visibility = View.GONE
             }
             // publish date
             if (info.publishDate != null) {
-                binding.tvDate.visibility = View.VISIBLE
-                binding.tvDate.text = getString(R.string.dis_publish_date, info.publishDate)
+                mBinding.tvDate.visibility = View.VISIBLE
+                mBinding.tvDate.text = getString(R.string.dis_publish_date, info.publishDate)
             } else {
-                binding.tvDate.visibility = View.GONE
+                mBinding.tvDate.visibility = View.GONE
             }
             //pages
             if (info.pages != null) {
-                binding.tvPages.visibility = View.VISIBLE
-                binding.tvPages.text = getString(R.string.dis_pages, info.pages)
+                mBinding.tvPages.visibility = View.VISIBLE
+                mBinding.tvPages.text = getString(R.string.dis_pages, info.pages)
             } else {
-                binding.tvPages.visibility = View.GONE
+                mBinding.tvPages.visibility = View.GONE
             }
             // price
             if (info.price != null) {
-                binding.tvPrice.visibility = View.VISIBLE
-                binding.tvPrice.text = getString(R.string.dis_price, info.price)
+                mBinding.tvPrice.visibility = View.VISIBLE
+                mBinding.tvPrice.text = getString(R.string.dis_price, info.price)
             } else {
-                binding.tvPrice.visibility = View.GONE
+                mBinding.tvPrice.visibility = View.GONE
             }
             // isbn
-            binding.tvIsbn.visibility = View.VISIBLE
-            binding.tvIsbn.text = getString(R.string.dis_isbn, info.id)
+            mBinding.tvIsbn.visibility = View.VISIBLE
+            mBinding.tvIsbn.text = getString(R.string.dis_isbn, info.isbn)
             // desc
-            binding.tvDescription.text = info.description
+            mBinding.tvDescription.text = info.description
         }
+    }
+
+    override fun getOnBackInvokedDispatcher(): OnBackInvokedDispatcher {
+        return super.getOnBackInvokedDispatcher()
+    }
+
+    private fun showCloseDialog() {
+        MaterialAlertDialogBuilder(this)
+            .setTitle("Exit")
+            .setMessage("Are you really want to close the app")
+            .setPositiveButton("Close") { dialog, _ ->
+                dialog.dismiss()
+                finishAffinity()
+            }
+            .setNegativeButton("Stay", null)
+            .setCancelable(true)
+            .show()
     }
 }
